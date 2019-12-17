@@ -4,7 +4,7 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.Executor;
-import java.util.function.BiConsumer;
+import java.util.concurrent.ForkJoinPool;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -19,16 +19,18 @@ public class Monitor implements Executor
     private final static Logger LOG = LoggerFactory.getLogger(Monitor.class);
 
     private final IdGenerator processIdGenerator = new IdGenerator(0, Integer.MAX_VALUE);
-    private final BiConsumer<Runnable, Integer> executor;
+    private final Executor executor;
     private final Set<Integer> activeProcessIds = new HashSet<>();
     private final Listeners<Listener<Integer>, Integer> listeners = Listeners.newInstance();
 
     public Monitor()
     {
-        this.executor = (r, pid) -> {
-            String threadName = String.format("Process %s", formatProcessId(pid));
-            new Thread(r, threadName).start();
-        };
+        this(ForkJoinPool.commonPool());
+    }
+    
+    public Monitor(Executor executor)
+    {
+        this.executor = executor;
     }
 
     @Override
@@ -40,7 +42,7 @@ public class Monitor implements Executor
     private void runMonitored(Runnable process)
     {
         int processId = processStarting();
-        executor.accept(wrappedProcess(process, processId), processId);
+        executor.execute(wrappedProcess(process, processId));
     }
 
     private int processStarting()
